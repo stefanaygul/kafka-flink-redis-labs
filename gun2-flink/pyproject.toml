@@ -1,0 +1,25 @@
+[project]
+name = "kafka-lab-gun2"
+version = "1.0.0"
+description = "Gün 2 · Flink SQL: event time, pencereler, watermark, temporal join, feature job"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "confluent-kafka==2.16.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider -m 'not failover and not pipeline'"
+markers = [
+    "pipeline: feature job uçtan uca (make test-pipeline)",
+    "failover: TaskManager'ı yeniden başlatan prova (make test-failover)",
+]

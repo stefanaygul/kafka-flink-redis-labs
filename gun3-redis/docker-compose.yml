@@ -1,0 +1,143 @@
+# Gün 3 · Kafka + Flink (feature job) + Redis (online feature store) + Kafka UI
+#
+#   make up      başlat, feature job'ını gönder, hazır olana kadar bekle
+#   make down    durdur (veri kalır)
+#   make clean   durdur ve bütün veriyi sil
+#
+#   Bilgisayarınızdan: Kafka localhost:9092 · Flink UI http://localhost:8081 · Redis localhost:6379
+
+name: kafka-lab-gun3
+
+x-flink: &flink
+  image: kafka-lab-flink:1.20.5-kafka-3.4.0
+  # İmaj Docker Hub'da yok: burada derlenir (ilk seferde ~1 dk). İki servis de aynı imajı kullanır.
+  build: ./flink
+  pull_policy: build
+  restart: unless-stopped
+  environment:
+    FLINK_PROPERTIES: |
+      jobmanager.rpc.address: jobmanager
+      rest.address: jobmanager
+      jobmanager.memory.process.size: 1280m
+      taskmanager.memory.process.size: 2560m
+      taskmanager.memory.managed.fraction: 0.1
+      taskmanager.numberOfTaskSlots: 8
+      parallelism.default: 2
+      heartbeat.timeout: 20000
+      execution.checkpointing.interval: 10s
+      execution.checkpointing.mode: EXACTLY_ONCE
+      execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
+      state.backend.type: hashmap
+      state.checkpoints.dir: file:///flink-data/checkpoints
+      state.savepoints.dir: file:///flink-data/savepoints
+      state.checkpoints.num-retained: 3
+      restart-strategy.type: fixed-delay
+      restart-strategy.fixed-delay.attempts: 2147483647
+      restart-strategy.fixed-delay.delay: 5s
+      table.local-time-zone: UTC
+  volumes:
+    - flink-data:/flink-data
+
+services:
+  kafka:
+    image: apache/kafka:4.3.1
+    hostname: kafka
+    restart: unless-stopped
+    ports: ["${KAFKA_PORT:-9092}:9092"]
+    environment:
+      CLUSTER_ID: "Zdw6NUdhTdCrwbozVcHkmw"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:${KAFKA_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_LOG_CLEANER_BACKOFF_MS: 15000
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+    volumes: [kafka-data:/var/lib/kafka/data]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+  kafka-init:
+    image: apache/kafka:4.3.1
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        create() { /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --replication-factor 1 "$$@" > /dev/null; }
+        create --topic bank.transactions --partitions 6
+        # Flink'in feature'ları: key = customerId, compacted → Redis bu topic'ten yeniden kurulabilir.
+        create --topic bank.customer-features --partitions 6 --config cleanup.policy=compact \
+          --config segment.ms=300000 --config min.cleanable.dirty.ratio=0.1
+        # Risk skorları: key = customerId, her pencere için bir skor.
+        create --topic bank.risk-scores --partitions 6
+        echo "Topic'ler hazır."
+    restart: "no"
+
+  kafka-ui:
+    image: kafbat/kafka-ui:v1.5.0
+    restart: unless-stopped
+    depends_on:
+      kafka: { condition: service_healthy }
+    ports: ["${KAFKA_UI_PORT:-8080}:8080"]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: gun3
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: "false"
+      JAVA_OPTS: "-Xms128m -Xmx384m"
+
+  jobmanager:
+    <<: *flink
+    hostname: jobmanager
+    command: jobmanager
+    depends_on:
+      kafka: { condition: service_healthy }
+    ports: ["${FLINK_UI_PORT:-8081}:8081"]
+    volumes:
+      - flink-data:/flink-data
+      - ./sql:/opt/sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/overview > /dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  taskmanager:
+    <<: *flink
+    hostname: taskmanager
+    command: taskmanager
+    depends_on:
+      jobmanager: { condition: service_healthy }
+
+  redis:
+    image: redis:7.4.12-alpine
+    restart: unless-stopped
+    # AOF açık: "make redis-stop / redis-start" veriyi korur. Veri kaybı bilinçli olarak "make redis-flush" ile yapılır.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    ports: ["${REDIS_PORT:-6379}:6379"]
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  kafka-data:
+  flink-data:
+  redis-data:

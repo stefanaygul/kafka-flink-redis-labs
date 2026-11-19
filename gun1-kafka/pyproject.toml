@@ -1,0 +1,22 @@
+[project]
+name = "kafka-lab-gun1"
+version = "1.0.0"
+description = "Gün 1 · Python ile Kafka: 3 broker'lı cluster, producer, consumer, lag"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "confluent-kafka==2.16.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider -m 'not failover'"
+markers = ["failover: broker durdurup başlatan prova testi (make test-failover)"]

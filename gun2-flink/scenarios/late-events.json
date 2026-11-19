@@ -1,0 +1,21 @@
+{
+  "description": "Sıra dışı ve geç gelen olaylar: C-1001. Watermark gecikmesi 1 dk.",
+  "date": "2026-11-14",
+  "steps": [
+    { "say": "Aşama 1 · Sıra dışı olay: O4, O3'ten SONRA gönderiliyor ama event time'ı O3'ten ÖNCE." },
+    { "id": "O1", "customer": "C-1001", "time": "10:00:10", "amount": 100 },
+    { "id": "O2", "customer": "C-1001", "time": "10:01:20", "amount": 200 },
+    { "id": "O3", "customer": "C-1001", "time": "10:03:00", "amount": 300 },
+    { "id": "O4", "customer": "C-1001", "time": "10:02:15", "amount": 150, "note": "O3'ten sonra geldi, event time'ı daha erken: watermark'ın gerisinde değil, sayılır" },
+    { "say": "Aşama 2 · Zamanı ilerlet: O5 ile en büyük event time 10:08:00 → watermark 10:07:00." },
+    { "id": "O5", "customer": "C-1001", "time": "10:08:00", "amount": 250 },
+    { "pause": "04b: sonu ≤ 10:07 olan pencereler ŞİMDİ yazıldı. O4 doğru pencerelerde mi?", "seconds": 4 },
+    { "say": "Aşama 3 · Geç gelen olaylar: en son olaydan 2 dk ve 10 dk geride." },
+    { "id": "L2", "customer": "C-1001", "time": "10:06:00", "amount": 500, "note": "watermark'ın (10:07) gerisinde: 04a 'GEÇ KALDI' der. Sonu 10:07'den sonraki açık pencerelere yine girer" },
+    { "id": "L10", "customer": "C-1001", "time": "09:58:00", "amount": 1000, "note": "içinde olduğu pencerelerin hepsi kapanmış: hiçbir sonuçta görünmez" },
+    { "pause": "04a: L2 ve L10 'GEÇ KALDI'. 04b'de henüz yeni satır yok: açık pencereler kapanınca görünecek.", "seconds": 3 },
+    { "say": "Aşama 4 · Kapatıcı olay: başka müşteri (C-9000), watermark 10:19:00'a ilerler, C-1001'in bütün pencereleri kapanır." },
+    { "id": "CLOSE", "customer": "C-9000", "time": "10:20:00", "amount": 1, "note": "yalnızca watermark'ı ilerletir" },
+    { "pause": "04b: L2 (500 TL) bitişi 10:08–10:11 olan pencerelerde var; L10 (1000 TL) hiçbir yerde yok.", "seconds": 4 }
+  ]
+}

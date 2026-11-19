@@ -1,0 +1,26 @@
+[project]
+name = "kafka-lab-gun3"
+version = "1.0.0"
+description = "Gün 3 · Redis online feature store ve risk skorlama"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "confluent-kafka==2.16.1",
+    "redis==8.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider -m 'not failover and not pipeline'"
+markers = [
+    "pipeline: Flink → Redis → skor uçtan uca (make test-pipeline)",
+    "failover: Redis kesintisi provası (make test-failover)",
+]

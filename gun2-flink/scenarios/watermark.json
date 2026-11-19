@@ -1,0 +1,20 @@
+{
+  "description": "Ağır çekim: C-2001 her dakika bir işlem yapar. Watermark = en büyük event time − 1 dk. Pencere, watermark pencerenin SONUNU geçince yazılır.",
+  "date": "2026-11-14",
+  "steps": [
+    { "id": "W1", "customer": "C-2001", "time": "11:00:30", "amount": 10, "note": "watermark → 10:59:30" },
+    { "pause": "Henüz pencere yok. 04a'da watermark sütununa bakın: 10:59:30.", "seconds": 3 },
+    { "id": "W2", "customer": "C-2001", "time": "11:01:30", "amount": 20, "note": "watermark → 11:00:30" },
+    { "pause": "Hâlâ pencere yok. Neden? İlk pencere [10:56, 11:01): sonu 11:01, watermark 11:00:30.", "seconds": 3 },
+    { "id": "W3", "customer": "C-2001", "time": "11:02:30", "amount": 30, "note": "watermark → 11:01:30" },
+    { "pause": "04b: [10:56, 11:01) yazıldı → 1 işlem, 10 TL.", "seconds": 3 },
+    { "id": "W4", "customer": "C-2001", "time": "11:03:30", "amount": 40, "note": "watermark → 11:02:30" },
+    { "pause": "04b: [10:57, 11:02) → 2 işlem, 30 TL.", "seconds": 3 },
+    { "id": "W5", "customer": "C-2001", "time": "11:04:30", "amount": 50, "note": "watermark → 11:03:30" },
+    { "pause": "04b: [10:58, 11:03) → 3 işlem, 60 TL.", "seconds": 3 },
+    { "id": "W6", "customer": "C-2001", "time": "11:05:30", "amount": 60, "note": "watermark → 11:04:30" },
+    { "pause": "04b: [10:59, 11:04) → 4 işlem, 100 TL.", "seconds": 3 },
+    { "id": "W7", "customer": "C-2001", "time": "11:06:30", "amount": 70, "note": "watermark → 11:05:30" },
+    { "say": "04b: [11:00, 11:05) → 5 işlem, 150 TL. Pencereler her dakika, watermark sonlarını geçtikçe yazılır." }
+  ]
+}
